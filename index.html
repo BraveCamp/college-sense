@@ -20,6 +20,12 @@
     <!-- Custom styles for this template -->
     <link href="css/one-page-wonder.css" rel="stylesheet">
 
+    <!-- Highcharts -->
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"
+            integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+            crossorigin="anonymous"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+
   </head>
 
   <body>
@@ -48,16 +54,13 @@
     <section class="tool">
       <div class="container">
         <div class="row align-items-center">
-          <div class="col-lg-6 order-lg-2">
-            <div class="p-5">
-              <img class="img-fluid rounded-circle" src="img/01.jpg" alt="">
-            </div>
+          <div class="col-lg-6">
+            <div id="comparison-left"></div>
+            <div id="loan-details-left"></div>
           </div>
-          <div class="col-lg-6 order-lg-1">
-            <div class="p-5">
-              <h2 class="display-4">For those about to rock...</h2>
-              <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Quod aliquid, mollitia odio veniam sit iste esse assumenda amet aperiam exercitationem, ea animi blanditiis recusandae! Ratione voluptatum molestiae adipisci, beatae obcaecati.</p>
-            </div>
+          <div class="col-lg-6">
+            <div id="comparison-right"></div>
+            <div id="loan-details-right"></div>
           </div>
         </div>
       </div>
@@ -92,6 +95,219 @@
     <!-- Bootstrap core JavaScript -->
     <script src="vendor/jquery/jquery.min.js"></script>
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+        var tuitionPerYear = {
+            'Carnegie Mellon University': [67980, 1],
+            'Massachusetts Institute of Technology': [65478, 1],
+            'Saint Louis University': [56014, 1],
+            'Stanford University': [66696, 1],
+            'Truman State University': [20814, -1],
+            'University of California-Berkeley': [36369, 1],
+            'University of Chicago': [72717, 1],
+            'University of Illinois at Urbana-Champaign': [30064, -1],
+            'University of Missouri-Columbia': [25916, -1],
+            'Yale University': [68950, 1]
+        };
+        var jobSalaries = {
+            'Data Scientist': [87000, 120931, 158000],
+            'Software Engineer': [69000, 104463, 153000],
+            'Nurse': [52000, 65976, 91000],
+            'Accountant': [40000, 55202, 74000],
+            'Teacher': [32000, 45483, 66000],
+            'Web Developer': [56000, 88488, 128000],
+            'Marketing Manager': [56000, 80673, 115000],
+            'Financial Analyst': [47000, 63829, 87000],
+            'Chef': [30000, 54443, 67000],
+            'Physicist': [72000, 102798, 142000],
+            'Chemist': [42000, 55226, 77000]
+        };
+
+        function calculatePoints(institution, scholarship, job, interestRatePerYear, raiseRate, paymentPeriod) {
+            var tuition = tuitionPerYear[institution][0] * (1 - scholarship);
+            var interestRatePerMonth = interestRatePerYear / 12;
+            var paymentMonths = 12 * paymentPeriod;
+
+            var amortizedPayment = tuition * ((interestRatePerMonth * Math.pow((1 + interestRatePerMonth), paymentMonths)) /
+                (Math.pow((1 + interestRatePerMonth), paymentMonths) - 1));
+
+            if (tuitionPerYear[institution][1] === 1) {
+                var salary = jobSalaries[job][0] * 1.2
+            } else salary = jobSalaries[job][0];
+
+            var balance = tuition;
+
+
+            var dataPointsSalary = [];
+            var dataPointsLoan = [];
+            for (var i = 1; i <= paymentMonths; i++) {
+                if (i % 12 === 0) {
+                    salary *= raiseRate;
+                }
+                var interestPayment = interestRatePerMonth * balance;
+                var principalPayment = amortizedPayment - interestPayment;
+                balance = balance - principalPayment;
+                dataPointsSalary.push([i, salary]);
+                dataPointsLoan.push([i, balance]);
+            }
+
+            return [dataPointsSalary, dataPointsLoan, amortizedPayment * paymentMonths, tuition];
+        }
+
+        var slu = calculatePoints('University of Missouri-Columbia', 0.3, 'Software Engineer', 0.06, 1.02, 15);
+        $('#loan-details-left').html('Initial Loan: $' + slu[3] + '<br/>Total Payment: $' + slu[2]);
+        var mit = calculatePoints('University of Chicago', 0.3, 'Software Engineer', 0.06, 1.02, 15);
+        $('#loan-details-right').html('Initial Loan: $' + mit[3] + '<br/>Total Payment: $' + mit[2]);
+
+        Highcharts.chart('comparison-left', {
+            chart: {
+                type: 'area',
+                zoomType: 'x',
+                panning: true,
+                panKey: 'shift',
+                scrollablePlotArea: {
+                    minWidth: 500
+                }
+            },
+
+            title: {
+                text: 'Mizzou'
+            },
+
+            subtitle: {text: 'Software Engineer'},
+
+            xAxis: {
+                labels: {
+                    format: '{value}'
+                },
+                minRange: 5,
+                title: {
+                    text: 'Month'
+                }
+            },
+
+            yAxis: {
+                startOnTick: true,
+                endOnTick: false,
+                maxPadding: 0.35,
+                min: 0,
+                max: 150000,
+                title: {
+                    text: null
+                },
+                labels: {
+                    format: '${value}'
+                }
+            },
+
+            tooltip: {
+                headerFormat: 'Month: {point.x}<br>',
+                pointFormat: '${point.y:.2f} ',
+                shared: true
+            },
+
+            legend: {
+                enabled: false
+            },
+
+            series: [{
+                data: slu[0],
+                lineColor: Highcharts.getOptions().colors[1],
+                color: Highcharts.getOptions().colors[2],
+                fillOpacity: 0.5,
+                name: 'Elevation',
+                marker: {
+                    enabled: false
+                },
+                threshold: null
+            }, {
+                data: slu[1],
+                lineColor: Highcharts.getOptions().colors[1],
+                color: Highcharts.getOptions().colors[4],
+                fillOpacity: 0.5,
+                name: 'Elevation',
+                marker: {
+                    enabled: false
+                },
+                threshold: null
+            }]
+
+        });
+
+        Highcharts.chart('comparison-right', {
+            chart: {
+                type: 'area',
+                zoomType: 'x',
+                panning: true,
+                panKey: 'shift',
+                scrollablePlotArea: {
+                    minWidth: 500
+                }
+            },
+
+            title: {
+                text: 'University of Chicago'
+            },
+
+            subtitle: {text: 'Software Engineer'},
+
+            xAxis: {
+                labels: {
+                    format: '{value}'
+                },
+                minRange: 5,
+                title: {
+                    text: 'Month'
+                }
+            },
+
+            yAxis: {
+                startOnTick: true,
+                endOnTick: false,
+                maxPadding: 0.35,
+                min: 0,
+                max: 150000,
+                title: {
+                    text: null
+                },
+                labels: {
+                    format: '${value}'
+                }
+            },
+
+            tooltip: {
+                headerFormat: 'Month: {point.x}<br>',
+                pointFormat: '${point.y:.2f} ',
+                shared: true
+            },
+
+            legend: {
+                enabled: false
+            },
+
+            series: [{
+                data: mit[0],
+                lineColor: Highcharts.getOptions().colors[1],
+                color: Highcharts.getOptions().colors[2],
+                fillOpacity: 0.5,
+                name: 'Elevation',
+                marker: {
+                    enabled: false
+                },
+                threshold: null
+            }, {
+                data: mit[1],
+                lineColor: Highcharts.getOptions().colors[1],
+                color: Highcharts.getOptions().colors[4],
+                fillOpacity: 0.5,
+                name: 'Elevation',
+                marker: {
+                    enabled: false
+                },
+                threshold: null
+            }]
+
+        });
+    </script>
 
   </body>
 
